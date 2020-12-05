@@ -14,8 +14,24 @@ using namespace std;
 vector<int> sd;
 vector<string> ip;
 
-void childPlay(string s){
-	cout << s << endl;
+void confirmRightChild(string ip, int sd){
+	int sz;
+	read(sd, &sz, sizeof(int));
+	if(sz < 0)
+		cerr << "Couldn't get prefix: ";
+	char c[sz+1];
+	read(sd, c, sizeof(char) * sz);
+	c[sz] = 0;
+	if(ip.compare(string(c)) == 0){
+		c[0] = '1';
+		write(sd, c, sizeof(char));
+	}
+
+}
+
+void childPlay(string s, int sd){
+	confirmRightChild(s, sd);
+
 }
 
 void createChildren(){
@@ -24,30 +40,49 @@ void createChildren(){
 	fstream f("IPs.txt", fstream::in);
 	f >> c;
 	while(!f.eof()){
-		int s = socket(AF_UNIX, SOCK_STREAM, NULL);
-		sd.push_back(s);
+		int s[2];
+		socketpair(AF_UNIX, SOCK_STREAM, NULL, s);
+		sd.push_back(s[0]);
 		ip.push_back(c);
 		if((pid = fork()) == -1)
-			perror("Error at fork: ");
+			cerr << "Error at fork: ";
 		if(pid == 0){
 			f.close();
 			sd.clear();
 			ip.clear();
-			childPlay(c);
+			close(s[0]);
+			childPlay(c, s[1]);
 			exit(0);
 		}
+		close(s[1]);
 		f >> c;
 	}
 	f.close();
 }
 
+void confirmRightIP(string ip, int sd){
+	int x = ip.size();
+	if(write(sd, &x, sizeof(int)) < 0)
+		cerr << "Couldn't write... ";
+	write(sd, ip.c_str(), sizeof(char) * x);
+	char c;
+	if(read(sd, &c, sizeof(char)) < 0)
+		cerr << "Couldn't read.. ";
+	if(c != '1'){
+		cerr << "Some matching is wrong.. ";
+		return;
+	}
+	cout << "For ip " << ip << " we have descriptor " << sd << endl;
+}
+
+void parentWork(){
+	for(int i = 0; i < sd.size(); i++){
+		confirmRightIP(ip[i], sd[i]);
+	}
+}
+
 int main(){
 	createChildren();
-	for(int i = 0; i < sd.size(); i++){
-		wait(0);
-	}
-	printf("\n\nOkay, so now:\n");
-	for(int i = 0; i < sd.size(); i++){
-		cout << sd[i] << endl << ip[i] << endl;
-	}
+	parentWork();
+
 }
