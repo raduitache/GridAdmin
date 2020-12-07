@@ -10,70 +10,72 @@
 #include <libssh/libssh.h>
 
 
-#include "ssh_stuff.h"
 
 using namespace std;
+
+
+#include "ssh_stuff.h"
 
 
 vector<int> sd;
 vector<string> ip, mac;
 
-void confirmRightChild(string ip, string mac, int sd){
+void confirmRightChild(string ip, string mac, int sock){
 	int sz;
 	char *c;
-	read(sd, &sz, sizeof(int));
+	read(sock, &sz, sizeof(int));
 	if(sz < 0)
 		cerr << "Couldn't get prefix: ";
 	c = new char[sz+1];
-	read(sd, c, sizeof(char) * sz);
+	read(sock, c, sizeof(char) * sz);
 	c[sz] = 0;
 	if(ip.compare(string(c)) != 0){
 		c[0] = '0';
-		write(sd, c, sizeof(char));
+		write(sock, c, sizeof(char));
 	}
-	read(sd, &sz, sizeof(int));
+	read(sock, &sz, sizeof(int));
 	if(sz < 0)
 		cerr << "Couldn't get prefix: ";
 	c = new char[sz+1];
-	read(sd, c, sizeof(char) * sz);
+	read(sock, c, sizeof(char) * sz);
 	c[sz] = 0;
 	if(mac.compare(string(c)) != 0){
 		c[0] = '0';
-		write(sd, c, sizeof(char));
+		write(sock, c, sizeof(char));
 	}
 	else{
 		c[0] = '1';
-		write(sd, c, sizeof(char));
+		write(sock, c, sizeof(char));
 	}
 }
 
-void childPlay(string ip, string mac, int sd){
-	confirmRightChild(ip, mac, sd);
+void childPlay(string ip, string mac, int sock){
+	confirmRightChild(ip, mac, sock);
 	ssh_session my_ssh_session = ssh_new();
 	if (my_ssh_session == NULL)
 		cerr << ip << ":  error at ssh session" << endl;
-	ssh_options_set(my_ssh_session, SSH_OPTIONS_HOST, ip.c_str());
-	if(ssh_connect(my_ssh_session) != SSH_OK){
-		cerr << ip << ":   error connecting" << endl;
-	}
-
-	if(verify_knownhost(my_ssh_session) < 0){
-		ssh_disconnect(my_ssh_session);
-	}
-	else{
-		if(ssh_userauth_password(my_ssh_session, "admin", "adminpass") != SSH_AUTH_SUCCESS){
-			cerr << ip << ":   " << ssh_get_error(my_ssh_session) << endl;
-			ssh_disconnect(my_ssh_session);
+	connectSession(my_ssh_session, ip);
+	int len;
+	char *command;
+	while(true){
+		read(sock, &len, sizeof(int));
+		command = new char[len+1];
+		read(sock, command, len * sizeof(char));
+		command[len] = 0;
+		if(strcmp(command, "stat") == 0){
+			if(!ssh_is_connected(my_ssh_session))
+				connectSession(my_ssh_session, ip);
+			if(ssh_is_connected(my_ssh_session))
+				cout << ip << ":   online!" << endl;
 		}
-		else{
-			cout << ip << ":   is online!" << endl;
+		if(strcmp(command, "quit") == 0){
+			if(ssh_is_connected(my_ssh_session))
+				ssh_disconnect(my_ssh_session);
+			ssh_free(my_ssh_session);
+			return;
 		}
+		delete command;
 	}
-
-
-	ssh_disconnect(my_ssh_session);
-	ssh_free(my_ssh_session);
-
 }
 
 string getIp(string c){
@@ -114,16 +116,16 @@ void createChildren(){
 	f.close();
 }
 
-void confirmData(string ip, string mac, int sd){
+void confirmData(string ip, string mac, int sock){
 	int x = ip.size();
-	if(write(sd, &x, sizeof(int)) < 0)
+	if(write(sock, &x, sizeof(int)) < 0)
 		cerr << "Couldn't write... ";
-	write(sd, ip.c_str(), sizeof(char) * x);
+	write(sock, ip.c_str(), sizeof(char) * x);
 	x = mac.size();
-	write(sd, &x, sizeof(int));
-	write(sd, mac.c_str(), sizeof(char) * x);
+	write(sock, &x, sizeof(int));
+	write(sock, mac.c_str(), sizeof(char) * x);
 	char c;
-	if(read(sd, &c, sizeof(char)) < 0)
+	if(read(sock, &c, sizeof(char)) < 0)
 		cerr << "Couldn't read.. ";
 	if(c == '0'){
 		cerr << "Some matching is wrong.. ";
@@ -135,9 +137,18 @@ void parentWork(){
 	for(int i = 0; i < sd.size(); i++){
 		confirmData(ip[i], mac[i], sd[i]);
 	}
-	for(int i = 0; i < sd.size(); i++){
-		wait(NULL);
+	string command;
+	int len;
+	while(command != "quit"){
+		cin >> command;
+		len = command.length();
+		for(int i = 0; i < sd.size(); i++){
+			write(sd[i], &len, sizeof(int));
+			write(sd[i], command.c_str(), len * sizeof(char));
+		}
 	}
+	for(int i = 0; i < sd.size(); i++)
+		wait(NULL);
 }
 
 int main(){
