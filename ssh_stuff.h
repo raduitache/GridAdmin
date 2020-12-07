@@ -66,3 +66,57 @@ int verify_knownhost(ssh_session session){
 		ssh_clean_pubkey_hash(&hash);
 		return 0;
 }
+
+void connectSession(ssh_session session, string ip){
+	ssh_options_set(session, SSH_OPTIONS_HOST, ip.c_str());
+	if(ssh_connect(session) != SSH_OK){
+		cerr << ip << ":   error connecting" << endl;
+		return;
+	}
+
+	if(verify_knownhost(session) < 0){
+		ssh_disconnect(session);
+		return;
+	}
+	if(ssh_userauth_password(session, "admin", "adminpass") != SSH_AUTH_SUCCESS){
+		cerr << "auth error ";
+		cerr << ip << ":   " << ssh_get_error(session) << endl;
+		ssh_disconnect(session);
+	}
+}
+
+int sshCommand(ssh_session session, const char * command){
+	ssh_channel channel = ssh_channel_new(session);
+	int rc;
+	if(channel == NULL)
+		return SSH_ERROR;
+	if((rc = ssh_channel_open_session(channel)) != SSH_OK){
+		ssh_channel_free(channel);
+		return rc;
+	}
+	if((rc = ssh_channel_request_exec(channel, command)) != SSH_OK){
+		ssh_channel_close(channel);
+		ssh_channel_free(channel);
+		cout << "Motherfucker.." << endl;
+		return rc;
+	}
+	char buffer[256];
+	int nBytes;
+	while((nBytes = ssh_channel_read(channel, buffer, 256 * sizeof(char), 0)) > 0){
+		if(write(1, buffer, nBytes) != nBytes){
+			ssh_channel_close(channel);
+			ssh_channel_free(channel);
+			return SSH_ERROR;
+		}
+	}
+
+	if(nBytes < 0){
+		ssh_channel_close(channel);
+		ssh_channel_free(channel);
+		return SSH_ERROR;
+	}
+	ssh_channel_send_eof(channel);
+	ssh_channel_close(channel);
+	ssh_channel_free(channel);
+	return SSH_OK;
+}

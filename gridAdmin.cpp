@@ -68,11 +68,17 @@ void childPlay(string ip, string mac, int sock){
 			if(ssh_is_connected(my_ssh_session))
 				cout << ip << ":   online!" << endl;
 		}
-		if(strcmp(command, "quit") == 0){
+		else if(strcmp(command, "quit") == 0){
 			if(ssh_is_connected(my_ssh_session))
 				ssh_disconnect(my_ssh_session);
 			ssh_free(my_ssh_session);
 			return;
+		}
+		else {
+			if(!ssh_is_connected(my_ssh_session))
+				connectSession(my_ssh_session, ip);
+			if(ssh_is_connected(my_ssh_session) and sshCommand(my_ssh_session, command) != SSH_OK)
+				cout << ip << ":   Could not execute command: " << ssh_get_error(my_ssh_session) << endl;
 		}
 		delete command;
 	}
