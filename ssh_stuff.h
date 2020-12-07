@@ -59,7 +59,7 @@ int verify_knownhost(ssh_session session){
 			}
 			break;
 		case SSH_KNOWN_HOSTS_ERROR:
-			fprintf(stderr, "Error %s", ssh_get_error(session));
+			cerr << "Error: " << ssh_get_error(session) << endl;
 			ssh_clean_pubkey_hash(&hash);
 			return -1;
 		}
@@ -97,7 +97,6 @@ int sshCommand(ssh_session session, const char * command){
 	if((rc = ssh_channel_request_exec(channel, command)) != SSH_OK){
 		ssh_channel_close(channel);
 		ssh_channel_free(channel);
-		cout << "Motherfucker.." << endl;
 		return rc;
 	}
 	char buffer[256];
