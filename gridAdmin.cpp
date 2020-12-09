@@ -4,8 +4,10 @@
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
+#include <algorithm>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <libssh/libssh.h>
 
@@ -49,6 +51,63 @@ void confirmRightChild(string ip, string mac, int sock){
 	}
 }
 
+vector<int> getMacValuesFromString(string mac){
+	vector<int> res(6);
+	transform(mac.begin(), mac.end(), mac.begin(), ::toupper);
+	for(int i = 0; i < 6; i++){
+		if(mac[i * 3] >= 'A')
+			res[i] = mac[i * 3] - 'A' + 10;
+		else
+			res[i] = mac[i * 3] - '0';
+		res[i] *= 16;
+		if(mac[i * 3 + 1] >= 'A')
+			res[i] += mac[i * 3 + 1] - 'A' + 10;
+		else
+			res[i] += mac[i * 3 + 1] - '0';
+	}
+	return res;
+}
+
+unsigned char* createMagicPacket(vector<int> mac){
+	unsigned char *packet = (unsigned char*)malloc(102 * sizeof(unsigned char));
+	for(int i = 0; i < 6; i++)
+		packet[i] = 0xff;
+	for(int i = 1; i <= 16; i++)
+		for(int j = 0; j < mac.size(); j++)
+			packet[i*6+j] = mac[j];
+	return packet;
+}
+
+
+void sendMagicPackage(string ip, vector<int> mac){
+	unsigned char *packet = createMagicPacket(mac);
+	int udpSocket, broadcast = 1;
+	struct sockaddr_in server, client;
+	bzero(&server, sizeof(server));
+	bzero(&client, sizeof(client));
+
+	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+
+	if(setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1){
+		perror("setsockopt (SO_BROADCAST)");
+		exit(EXIT_FAILURE);
+	}
+
+	client.sin_family = AF_INET;
+	client.sin_addr.s_addr = INADDR_ANY;
+	client.sin_port = 0;
+	bind(udpSocket, (struct sockaddr*) &client, sizeof(client));
+
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = inet_addr("192.168.1.3");
+	server.sin_port = htons(9);
+
+	if(sendto(udpSocket, packet, sizeof(unsigned char) * 102, 0, (struct sockaddr*) &server, sizeof(server)) == 102)
+		cout << ip << ":   wake signal sent" << endl;
+	close(udpSocket);
+	free(packet);
+}
+
 void childPlay(string ip, string mac, int sock){
 	confirmRightChild(ip, mac, sock);
 	ssh_session my_ssh_session = ssh_new();
@@ -67,6 +126,12 @@ void childPlay(string ip, string mac, int sock){
 				connectSession(my_ssh_session, ip);
 			if(ssh_is_connected(my_ssh_session))
 				cout << ip << ":   online!" << endl;
+		}
+		else if(strcmp(command, "wake") == 0){
+			if(mac.size() == 0)
+				cout << ip << ":   unknown MAC address" << endl;
+			else
+				sendMagicPackage(ip, getMacValuesFromString(mac));
 		}
 		else if(strcmp(command, "quit") == 0){
 			if(ssh_is_connected(my_ssh_session))
@@ -146,7 +211,7 @@ void parentWork(){
 	string command;
 	int len;
 	while(command != "quit"){
-		cin >> command;
+		getline(cin, command);
 		len = command.length();
 		for(int i = 0; i < sd.size(); i++){
 			write(sd[i], &len, sizeof(int));
