@@ -99,7 +99,7 @@ void sendMagicPackage(string ip, vector<int> mac){
 	bind(udpSocket, (struct sockaddr*) &client, sizeof(client));
 
 	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = inet_addr("192.168.1.3");
+	server.sin_addr.s_addr = inet_addr(ip.c_str());
 	server.sin_port = htons(9);
 
 	if(sendto(udpSocket, packet, sizeof(unsigned char) * 102, 0, (struct sockaddr*) &server, sizeof(server)) == 102)
