@@ -1,15 +1,19 @@
 #include <vector>
 #include <string>
 #include <fstream>
-#include <iostream>
+#include <fcntl.h>
 #include <stdlib.h>
+#include <iostream>
 #include <unistd.h>
+#include <ncurses.h>
 #include <algorithm>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <libssh/libssh.h>
+#include <ext/stdio_filebuf.h>
 
 
 
@@ -21,6 +25,8 @@ using namespace std;
 
 vector<int> sd;
 vector<string> ip, mac;
+WINDOW * win;
+int x, y;
 
 void confirmRightChild(string ip, string mac, int sock){
 	int sz;
@@ -118,9 +124,8 @@ void childPlay(string ip, string mac, int sock){
 	char *command;
 	while(true){
 		read(sock, &len, sizeof(int));
-		command = new char[len+1];
+		command = new char[len];
 		read(sock, command, len * sizeof(char));
-		command[len] = 0;
 		if(strcmp(command, "stat") == 0){
 			if(!ssh_is_connected(my_ssh_session))
 				connectSession(my_ssh_session, ip);
@@ -212,7 +217,8 @@ void parentWork(){
 	int len;
 	while(command != "quit"){
 		getline(cin, command);
-		len = command.length();
+		cerr << command << endl;
+		len = command.length() + 1;
 		for(int i = 0; i < sd.size(); i++){
 			write(sd[i], &len, sizeof(int));
 			write(sd[i], command.c_str(), len * sizeof(char));
@@ -222,7 +228,74 @@ void parentWork(){
 		wait(NULL);
 }
 
+void* writeManager(void *args){
+    int fd = *(int*) args, len, flags;
+	FILE *f = fdopen(fd, "r");
+	__gnu_cxx::stdio_filebuf<char> fbuf(f, ios::in);
+	istream stm(&fbuf);
+	string command;
+    while(true){
+		getline(stm, command);
+		wprintw(win, "\n");
+		wprintw(win, command.c_str());
+		//fcntl(fd, F_SETFL, O_NONBLOCK);
+		//cerr << "We selected something.." << endl;
+		//while((len = read(fd, buff, 512)) > 0){
+		//	wprintw(win, buff);
+		//}
+		//flags = fcntl(fd, F_GETFL, 0);
+		//flags &= ~O_NONBLOCK;
+		//fcntl(fd, F_SETFL, flags);
+        wrefresh(win);
+        //refresh();
+   }
+   fclose(f);
+}
+
+void ncursesDisplay(int sock){
+	x = y = 0;
+	initscr();
+	win = newwin(0, 0, 0, 0);
+	refresh();
+	cbreak();
+	noecho();
+	keypad(stdscr, TRUE);
+	pthread_t thread;
+	pthread_create(&thread, 0, writeManager, &sock);
+	string command;
+	char ch;
+	while(command != "quit\n"){
+		command.clear();
+		while((ch = getch()) != '\n'){
+			command.append(1, ch);
+			wprintw(win, "%c", ch);
+			wrefresh(win);
+		}
+		command.append(1, '\n');
+		write(sock, command.c_str(), command.length());	
+	}
+}
+
 int main(){
-	createChildren();
-	parentWork();
+	int sp[2];
+	socketpair(AF_UNIX, SOCK_DGRAM, 0, sp);
+	int pid = fork();
+	if(pid == -1){
+		cerr << "Error at fork()" << endl;
+		return -1;
+	}
+	if(pid == 0){
+		dup2(sp[1], 0);
+		dup2(sp[1], 1);
+		dup2(sp[1], 2);
+		close(sp[0]);
+		close(sp[1]);
+		createChildren();
+		parentWork();
+		return 0;
+	}
+	close(sp[1]);
+	ncursesDisplay(sp[0]);
+	wait(0);
+	endwin();
 }
