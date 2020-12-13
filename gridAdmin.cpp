@@ -25,37 +25,8 @@ using namespace std;
 
 vector<int> sd;
 vector<string> ip, mac;
-WINDOW * win;
-int x, y;
-
-void confirmRightChild(string ip, string mac, int sock){
-	int sz;
-	char *c;
-	read(sock, &sz, sizeof(int));
-	if(sz < 0)
-		cerr << "Couldn't get prefix: ";
-	c = new char[sz+1];
-	read(sock, c, sizeof(char) * sz);
-	c[sz] = 0;
-	if(ip.compare(string(c)) != 0){
-		c[0] = '0';
-		write(sock, c, sizeof(char));
-	}
-	read(sock, &sz, sizeof(int));
-	if(sz < 0)
-		cerr << "Couldn't get prefix: ";
-	c = new char[sz+1];
-	read(sock, c, sizeof(char) * sz);
-	c[sz] = 0;
-	if(mac.compare(string(c)) != 0){
-		c[0] = '0';
-		write(sock, c, sizeof(char));
-	}
-	else{
-		c[0] = '1';
-		write(sock, c, sizeof(char));
-	}
-}
+int x, y, termline;
+string response;
 
 vector<int> getMacValuesFromString(string mac){
 	vector<int> res(6);
@@ -95,7 +66,11 @@ void sendMagicPackage(string ip, vector<int> mac){
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
 	if(setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1){
-		perror("setsockopt (SO_BROADCAST)");
+		response.clear();
+		response += "setsockopt (SO_BROADCAST)\n";
+		int x = response.length();
+		write(1, &x, sizeof(int));
+		write(1, response.c_str(), x * sizeof(char));
 		exit(EXIT_FAILURE);
 	}
 
@@ -108,17 +83,28 @@ void sendMagicPackage(string ip, vector<int> mac){
 	server.sin_addr.s_addr = inet_addr(ip.c_str());
 	server.sin_port = htons(9);
 
-	if(sendto(udpSocket, packet, sizeof(unsigned char) * 102, 0, (struct sockaddr*) &server, sizeof(server)) == 102)
-		cout << ip << ":   wake signal sent" << endl;
+	if(sendto(udpSocket, packet, sizeof(unsigned char) * 102, 0, (struct sockaddr*) &server, sizeof(server)) == 102){
+		response.clear();
+		response += ip;
+		response += ":   wake signal sent\n";
+		int x = response.length();
+		write(1, &x, sizeof(int));
+		write(1, response.c_str(), x * sizeof(char));
+	}
 	close(udpSocket);
 	free(packet);
 }
 
 void childPlay(string ip, string mac, int sock){
-	confirmRightChild(ip, mac, sock);
 	ssh_session my_ssh_session = ssh_new();
-	if (my_ssh_session == NULL)
-		cerr << ip << ":  error at ssh session" << endl;
+	if (my_ssh_session == NULL){
+		response.clear();
+		response += ip;
+		response += ": error at ssh session\n";
+		int x = response.length();
+		write(1, &x, sizeof(int));
+		write(1, response.c_str(), x * sizeof(char));
+	}
 	connectSession(my_ssh_session, ip);
 	int len;
 	char *command;
@@ -129,12 +115,24 @@ void childPlay(string ip, string mac, int sock){
 		if(strcmp(command, "stat") == 0){
 			if(!ssh_is_connected(my_ssh_session))
 				connectSession(my_ssh_session, ip);
-			if(ssh_is_connected(my_ssh_session))
-				cout << ip << ":   online!" << endl;
+			if(ssh_is_connected(my_ssh_session)){
+				response.clear();
+				response += ip;
+				response += ":   online!\n";
+				int x = response.length();
+				write(1, &x, sizeof(int));
+				write(1, response.c_str(), x * sizeof(char));
+			}
 		}
 		else if(strcmp(command, "wake") == 0){
-			if(mac.size() == 0)
-				cout << ip << ":   unknown MAC address" << endl;
+			if(mac.size() == 0){
+				response.clear();
+				response += ip;
+				response += ":   unknown MAC address";
+				int x = response.length();
+				write(1, &x, sizeof(int));
+				write(1, response.c_str(), x * sizeof(char));
+			}
 			else
 				sendMagicPackage(ip, getMacValuesFromString(mac));
 		}
@@ -147,8 +145,16 @@ void childPlay(string ip, string mac, int sock){
 		else {
 			if(!ssh_is_connected(my_ssh_session))
 				connectSession(my_ssh_session, ip);
-			if(ssh_is_connected(my_ssh_session) and sshCommand(my_ssh_session, command) != SSH_OK)
-				cout << ip << ":   Could not execute command: " << ssh_get_error(my_ssh_session) << endl;
+			if(ssh_is_connected(my_ssh_session) and sshCommand(my_ssh_session, command) != SSH_OK){
+				response.clear();
+				response += ip;
+				response += ":   Could not execute command: ";
+				response += ssh_get_error(my_ssh_session);
+				response += '\n';
+				int x = response.length();
+				write(1, &x, sizeof(int));
+				write(1, response.c_str(), x * sizeof(char));
+			}
 		}
 		delete command;
 	}
@@ -176,8 +182,13 @@ void createChildren(){
 		sd.push_back(s[0]);
 		ip.push_back(getIp(c));
 		mac.push_back(getMac(c));
-		if((pid = fork()) == -1)
-			cerr << "Error at fork: ";
+		if((pid = fork()) == -1){
+			response.clear();
+			response += "Error at fork()\n";
+			int x = response.length();
+			write(1, &x, sizeof(int));
+			write(1, response.c_str(), x * sizeof(char));
+		}
 		if(pid == 0){
 			f.close();
 			sd.clear();
@@ -192,32 +203,11 @@ void createChildren(){
 	f.close();
 }
 
-void confirmData(string ip, string mac, int sock){
-	int x = ip.size();
-	if(write(sock, &x, sizeof(int)) < 0)
-		cerr << "Couldn't write... ";
-	write(sock, ip.c_str(), sizeof(char) * x);
-	x = mac.size();
-	write(sock, &x, sizeof(int));
-	write(sock, mac.c_str(), sizeof(char) * x);
-	char c;
-	if(read(sock, &c, sizeof(char)) < 0)
-		cerr << "Couldn't read.. ";
-	if(c == '0'){
-		cerr << "Some matching is wrong.. ";
-		return;
-	}
-}
-
 void parentWork(){
-	for(int i = 0; i < sd.size(); i++){
-		confirmData(ip[i], mac[i], sd[i]);
-	}
 	string command;
 	int len;
 	while(command != "quit"){
 		getline(cin, command);
-		cerr << command << endl;
 		len = command.length() + 1;
 		for(int i = 0; i < sd.size(); i++){
 			write(sd[i], &len, sizeof(int));
@@ -229,36 +219,30 @@ void parentWork(){
 }
 
 void* writeManager(void *args){
-    int fd = *(int*) args, len, flags;
-	FILE *f = fdopen(fd, "r");
-	__gnu_cxx::stdio_filebuf<char> fbuf(f, ios::in);
-	istream stm(&fbuf);
-	string command;
+    int fd = *(int*) args, len, flags, msglen;
+	char command[256];
     while(true){
-		getline(stm, command);
-		wprintw(win, "\n");
-		wprintw(win, command.c_str());
-		//fcntl(fd, F_SETFL, O_NONBLOCK);
-		//cerr << "We selected something.." << endl;
-		//while((len = read(fd, buff, 512)) > 0){
-		//	wprintw(win, buff);
-		//}
-		//flags = fcntl(fd, F_GETFL, 0);
-		//flags &= ~O_NONBLOCK;
-		//fcntl(fd, F_SETFL, flags);
-        wrefresh(win);
-        //refresh();
+		read(fd, &msglen, sizeof(int));
+		while(msglen){
+			len = read(fd, command, min(255, msglen));
+			command[len] = 0;
+			if(termline){
+				printw("\n");
+				termline = 0;
+			}
+			printw(command);
+			msglen -= len;
+		}
+        refresh();
    }
-   fclose(f);
 }
 
 void ncursesDisplay(int sock){
-	x = y = 0;
+	termline = x = y = 0;
 	initscr();
-	win = newwin(0, 0, 0, 0);
-	refresh();
 	cbreak();
 	noecho();
+	scrollok(stdscr, 1);
 	keypad(stdscr, TRUE);
 	pthread_t thread;
 	pthread_create(&thread, 0, writeManager, &sock);
@@ -267,9 +251,12 @@ void ncursesDisplay(int sock){
 	while(command != "quit\n"){
 		command.clear();
 		while((ch = getch()) != '\n'){
-			command.append(1, ch);
-			wprintw(win, "%c", ch);
-			wrefresh(win);
+			command += ch;
+			if(!termline){
+				printw("\n");
+				termline = 1;
+			}
+			printw("%c", ch);
 		}
 		command.append(1, '\n');
 		write(sock, command.c_str(), command.length());	
