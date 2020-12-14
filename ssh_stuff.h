@@ -63,7 +63,7 @@ int verify_knownhost(ssh_session session){
 		case SSH_KNOWN_HOSTS_UNKNOWN:
 			hexa = ssh_get_hexa(hash, hlen);
 			response.clear();
-			response += "The server is unknown. Do you trust the host key?\n";
+			response += "The server is unknown. Adding to the list of trusted host keys.";
 			response += "Public key hash: ";
 			response += hexa;
 			response += '\n';
@@ -74,14 +74,6 @@ int verify_knownhost(ssh_session session){
 			pthread_mutex_unlock(mx);
 			ssh_string_free_char(hexa);
 			ssh_clean_pubkey_hash(&hash);
-			p = fgets(buf, sizeof(buf), stdin);
-			if (p == NULL) {
-				return -1;
-			}
-			cmp = strncasecmp(buf, "yes", 3);
-			if (cmp != 0) {
-				return -1;
-			}
 			rc = ssh_session_update_known_hosts(session);
 			if (rc < 0) {
 				response.clear();

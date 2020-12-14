@@ -60,7 +60,7 @@ unsigned char* createMagicPacket(vector<int> mac){
 }
 
 int setMutex(){
-    int fd = shm_open(SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR);
+    int fd = shm_open(SHM_FILENAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     if(fd == -1)
         return -1;
     if(ftruncate(fd, sizeof(pthread_mutex_t)) == -1)
@@ -158,7 +158,7 @@ void childPlay(string ip, string mac, int sock){
 			if(mac.size() == 0){
 				response.clear();
 				response += ip;
-				response += ":   unknown MAC address";
+				response += ":   unknown MAC address\n";
 				int x = response.length();
 				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
@@ -255,21 +255,21 @@ void parentWork(){
 }
 
 void* writeManager(void *args){
-    int fd = *(int*) args, len, flags, msglen;
-	char command[256];
+    int fd = *(int*) args, len;
+	char *command;
     while(true){
-		read(fd, &msglen, sizeof(int));
-		while(msglen){
-			len = read(fd, command, min(255, msglen));
-			command[len] = 0;
-			if(termline){
-				printw("\n");
-				termline = 0;
-			}
-			printw(command);
-			msglen -= len;
+		read(fd, &len, sizeof(int));
+		command = new char[len+1];
+		read(fd, command, len);
+		command[len] = 0;
+		
+		if(termline){
+			printw("\n");
+			termline = 0;
 		}
+		printw(command);
         refresh();
+		delete command;
    }
 }
 
