@@ -1,5 +1,6 @@
 #include <string.h>
 extern string response;
+extern pthread_mutex_t *mx;
 int verify_knownhost(ssh_session session){
 	enum ssh_known_hosts_e state;
 	unsigned char *hash = NULL;
@@ -30,8 +31,10 @@ int verify_knownhost(ssh_session session){
 			response += "Host key for server changed: it is now:\n";
 			response += "For security reasons, connection will be stopped\n";
 			x = response.length();
+			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
 			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
 			
 			ssh_print_hash(SSH_PUBLICKEY_HASH_SHA256, hash, hlen);
 			ssh_clean_pubkey_hash(&hash);
@@ -41,8 +44,10 @@ int verify_knownhost(ssh_session session){
 			response += "The host key for this server was not found but an other type of key exists.\n";
 			response += "An attacker might change the default server key to confuse your client into thinking the key does not exist\n";
 			x = response.length();
+			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
 			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
 			ssh_clean_pubkey_hash(&hash);
 			return -1;
 		case SSH_KNOWN_HOSTS_NOT_FOUND:
@@ -50,8 +55,10 @@ int verify_knownhost(ssh_session session){
 			response += "Could not find known host file.\n";
 			response += "If you accept the host key here, the file will be automatically created.\n";
 			x = response.length();
+			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
 			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
 		/* FALL THROUGH to SSH_SERVER_NOT_KNOWN behavior */
 		case SSH_KNOWN_HOSTS_UNKNOWN:
 			hexa = ssh_get_hexa(hash, hlen);
@@ -61,8 +68,10 @@ int verify_knownhost(ssh_session session){
 			response += hexa;
 			response += '\n';
 			x = response.length();
+			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
 			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
 			ssh_string_free_char(hexa);
 			ssh_clean_pubkey_hash(&hash);
 			p = fgets(buf, sizeof(buf), stdin);
@@ -80,8 +89,10 @@ int verify_knownhost(ssh_session session){
 				response += strerror(errno);
 				response += '\n';
 				x = response.length();
+				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
 				write(1, response.c_str(), x * sizeof(char));
+				pthread_mutex_unlock(mx);
 				return -1;
 			}
 			break;
@@ -91,8 +102,10 @@ int verify_knownhost(ssh_session session){
 			response += ssh_get_error(session);
 			response += '\n';
 			x = response.length();
+			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
 			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
 			ssh_clean_pubkey_hash(&hash);
 			return -1;
 		}
@@ -107,8 +120,10 @@ void connectSession(ssh_session session, string ip){
 		response += ip;
 		response += ":   error connecting\n";
 		int x = response.length();
+		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
 		write(1, response.c_str(), x * sizeof(char));
+		pthread_mutex_unlock(mx);
 		return;
 	}
 
@@ -124,8 +139,10 @@ void connectSession(ssh_session session, string ip){
 		response += ssh_get_error(session);
 		response += '\n';
 		int x = response.length();
+		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
 		write(1, response.c_str(), x * sizeof(char));
+		pthread_mutex_unlock(mx);
 		ssh_disconnect(session);
 	}
 }
@@ -146,14 +163,17 @@ int sshCommand(ssh_session session, const char * command){
 	}
 	char buffer[256];
 	int nBytes;
+	pthread_mutex_lock(mx);
 	while((nBytes = ssh_channel_read(channel, buffer, 256 * sizeof(char), 0)) > 0){
 		write(1, &nBytes, sizeof(int));
 		if(write(1, buffer, nBytes * sizeof(char)) != nBytes){
 			ssh_channel_close(channel);
 			ssh_channel_free(channel);
+			pthread_mutex_unlock(mx);
 			return SSH_ERROR;
 		}
 	}
+	pthread_mutex_unlock(mx);
 
 	if(nBytes < 0){
 		ssh_channel_close(channel);

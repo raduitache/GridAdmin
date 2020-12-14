@@ -8,6 +8,8 @@
 #include <ncurses.h>
 #include <algorithm>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
@@ -15,6 +17,7 @@
 #include <libssh/libssh.h>
 #include <ext/stdio_filebuf.h>
 
+#define SHM_FILENAME "gridAdmin.shm"
 
 
 using namespace std;
@@ -27,6 +30,7 @@ vector<int> sd;
 vector<string> ip, mac;
 int x, y, termline;
 string response;
+pthread_mutex_t *mx;
 
 vector<int> getMacValuesFromString(string mac){
 	vector<int> res(6);
@@ -55,6 +59,24 @@ unsigned char* createMagicPacket(vector<int> mac){
 	return packet;
 }
 
+int setMutex(){
+    int fd = shm_open(SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR);
+    if(fd == -1)
+        return -1;
+    if(ftruncate(fd, sizeof(pthread_mutex_t)) == -1)
+        return -1;
+    mx = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if((long)mx == MAP_SHARED)
+        return -1;
+    close(fd);
+    
+    pthread_mutexattr_t mutexattr;
+    pthread_mutexattr_init(&mutexattr);
+    pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(mx, &mutexattr);
+	return 0;
+}
+
 
 void sendMagicPackage(string ip, vector<int> mac){
 	unsigned char *packet = createMagicPacket(mac);
@@ -69,8 +91,10 @@ void sendMagicPackage(string ip, vector<int> mac){
 		response.clear();
 		response += "setsockopt (SO_BROADCAST)\n";
 		int x = response.length();
+		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
 		write(1, response.c_str(), x * sizeof(char));
+		pthread_mutex_unlock(mx);
 		exit(EXIT_FAILURE);
 	}
 
@@ -88,8 +112,10 @@ void sendMagicPackage(string ip, vector<int> mac){
 		response += ip;
 		response += ":   wake signal sent\n";
 		int x = response.length();
+		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
 		write(1, response.c_str(), x * sizeof(char));
+		pthread_mutex_unlock(mx);
 	}
 	close(udpSocket);
 	free(packet);
@@ -102,8 +128,10 @@ void childPlay(string ip, string mac, int sock){
 		response += ip;
 		response += ": error at ssh session\n";
 		int x = response.length();
+		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
 		write(1, response.c_str(), x * sizeof(char));
+		pthread_mutex_unlock(mx);
 	}
 	connectSession(my_ssh_session, ip);
 	int len;
@@ -120,8 +148,10 @@ void childPlay(string ip, string mac, int sock){
 				response += ip;
 				response += ":   online!\n";
 				int x = response.length();
+				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
 				write(1, response.c_str(), x * sizeof(char));
+				pthread_mutex_unlock(mx);
 			}
 		}
 		else if(strcmp(command, "wake") == 0){
@@ -130,8 +160,10 @@ void childPlay(string ip, string mac, int sock){
 				response += ip;
 				response += ":   unknown MAC address";
 				int x = response.length();
+				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
 				write(1, response.c_str(), x * sizeof(char));
+				pthread_mutex_unlock(mx);
 			}
 			else
 				sendMagicPackage(ip, getMacValuesFromString(mac));
@@ -152,8 +184,10 @@ void childPlay(string ip, string mac, int sock){
 				response += ssh_get_error(my_ssh_session);
 				response += '\n';
 				int x = response.length();
+				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
 				write(1, response.c_str(), x * sizeof(char));
+				pthread_mutex_unlock(mx);
 			}
 		}
 		delete command;
@@ -186,8 +220,10 @@ void createChildren(){
 			response.clear();
 			response += "Error at fork()\n";
 			int x = response.length();
+			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
 			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
 		}
 		if(pid == 0){
 			f.close();
@@ -277,8 +313,12 @@ int main(){
 		dup2(sp[1], 2);
 		close(sp[0]);
 		close(sp[1]);
+		// since it's only these guys that need to synch their prints:
+		setMutex();
 		createChildren();
 		parentWork();
+		munmap(mx, sizeof(pthread_mutex_t));
+		shm_unlink(SHM_FILENAME);
 		return 0;
 	}
 	close(sp[1]);
