@@ -254,6 +254,16 @@ void parentWork(){
 		wait(NULL);
 }
 
+void removeCarriage(char *str){
+	int step = 0;
+	int len = strlen(str);
+	for(int i = 0; i <= len; i++){
+		str[i - step] = str[i];
+		if(str[i] == '\r')
+			step++;
+	}
+}
+
 void* writeManager(void *args){
     int fd = *(int*) args, len;
 	char *command;
@@ -262,6 +272,7 @@ void* writeManager(void *args){
 		command = new char[len+1];
 		read(fd, command, len);
 		command[len] = 0;
+		removeCarriage(command);
 		
 		if(termline){
 			printw("\n");
