@@ -12,10 +12,8 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <libssh/libssh.h>
-#include <ext/stdio_filebuf.h>
 
 #define SHM_FILENAME "gridAdmin.shm"
 
