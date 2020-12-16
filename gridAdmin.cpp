@@ -287,22 +287,49 @@ void ncursesDisplay(int sock){
 	initscr();
 	cbreak();
 	noecho();
-	scrollok(stdscr, 1);
+	clearok(stdscr, FALSE);
+	scrollok(stdscr, TRUE);
 	keypad(stdscr, TRUE);
 	pthread_t thread;
 	pthread_create(&thread, 0, writeManager, &sock);
 	string command;
-	char ch;
+	chtype ch;
 	while(command != "quit\n"){
 		command.clear();
 		while((ch = getch()) != '\n'){
-			command += ch;
-			if(!termline){
-				printw("\n");
-				termline = 1;
+			getyx(stdscr, y, x);
+			if(ch == KEY_BACKSPACE){
+				mvdelch(y, x-1);
+				if(command.length())
+					command.erase(x - 1, 1);
 			}
-			printw("%c", ch);
+			else if(ch == KEY_LEFT){
+				move(y, x-1);
+			}
+			else if(ch == KEY_RIGHT){
+				move(y, min(command.length(), (unsigned long)x+1));
+			}
+			else if (ch == KEY_UP){
+				scrl(-1);
+			}
+			else if (ch == KEY_DOWN)
+			{
+				scrl(1);
+			}
+
+			else{
+				command.insert(command.begin() + x, (char)ch);
+				if(!termline){
+					printw("\n");
+					termline = 1;
+				}
+				getyx(stdscr, y, x);
+				insch(ch);
+				move(y, x+1);
+			}
 		}
+		getyx(stdscr, y, x);
+		move(y, command.length());
 		command.append(1, '\n');
 		write(sock, command.c_str(), command.length());	
 	}
