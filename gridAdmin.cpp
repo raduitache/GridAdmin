@@ -1,3 +1,4 @@
+#include <stack>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -26,6 +27,7 @@ using namespace std;
 
 vector<int> sd;
 vector<string> ip, mac;
+stack<string> prevRows, nextRows;
 int x, y, termline;
 string response;
 pthread_mutex_t *mx;
@@ -256,7 +258,8 @@ void parentWork(){
 		wait(NULL);
 }
 
-void removeCarriage(char *str){
+void formatCommand(char *str){
+	// get rid of CR, for responses from windows machines.
 	int step = 0;
 	int len = strlen(str);
 	for(int i = 0; i <= len; i++){
@@ -264,6 +267,22 @@ void removeCarriage(char *str){
 		if(str[i] == '\r')
 			step++;
 	}
+
+
+	// we also kinda need to keep track of rows that will be wiped by scroll.
+	int newLines = 0;
+	len = strlen(str);
+	for(int i = 0; i < len; i++)
+		newLines += (str[i] == '\n');
+	
+	// we need to know when and how much we'll be scrolling.
+	getyx(stdscr, y, x);
+	char smth[257];
+	for(int i = 0; i < newLines - (LINES - y - 1); i++){
+		mvwinstr(stdscr, i, 0, smth);
+		prevRows.push(string(smth));
+	}
+	move(y, x);
 }
 
 void* writeManager(void *args){
@@ -274,7 +293,7 @@ void* writeManager(void *args){
 		command = new char[len+1];
 		read(fd, command, len);
 		command[len] = 0;
-		removeCarriage(command);
+		formatCommand(command);
 		
 		if(termline){
 			termline = 0;
@@ -283,6 +302,32 @@ void* writeManager(void *args){
         refresh();
 		delete command;
    }
+}
+
+void scrollUp(){
+	if(prevRows.size()){
+		char lastLine[COLS + 1];
+		getyx(stdscr, y, x);
+		mvwinstr(stdscr, y, 0, lastLine);
+		nextRows.push(string(lastLine));
+		scrl(-1);
+		mvprintw(0, 0, prevRows.top().c_str());
+		prevRows.pop();
+		move(y, x);
+	}
+}
+
+void scrollDown(){
+	if(nextRows.size()){
+		char prevLine[COLS + 1];
+		getyx(stdscr, y, x);
+		mvwinstr(stdscr, 0, 0, prevLine);
+		prevRows.push(string(prevLine));
+		scrl(1);
+		mvprintw(LINES-2, 0, nextRows.top().c_str());
+		nextRows.pop();
+		move(y, x);
+	}
 }
 
 void ncursesDisplay(int sock){
@@ -313,11 +358,11 @@ void ncursesDisplay(int sock){
 				move(y, min(command.length(), (unsigned long)x+1));
 			}
 			else if (ch == KEY_UP){
-				scrl(-1);
+				scrollUp();
 			}
 			else if (ch == KEY_DOWN)
 			{
-				scrl(1);
+				scrollDown();
 			}
 
 			else{
@@ -327,7 +372,13 @@ void ncursesDisplay(int sock){
 				}
 				getyx(stdscr, y, x);
 				command.insert(command.begin() + x, (char)ch);
-				
+				if(y == LINES - 1 && ch == '\n'){
+					char *line;
+					mvwinstr(stdscr, 0, 0, line);
+					prevRows.push(string(line));
+					move(y, x);
+				}
+
 				insch(ch);
 				move(y, x+1);
 			}
