@@ -87,7 +87,7 @@ void sendMagicPackage(string ip, vector<int> mac){
 
 	if(setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1){
 		response.clear();
-		response += "setsockopt (SO_BROADCAST)\n";
+		response += "\nsetsockopt (SO_BROADCAST)";
 		int x = response.length();
 		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
@@ -107,8 +107,9 @@ void sendMagicPackage(string ip, vector<int> mac){
 
 	if(sendto(udpSocket, packet, sizeof(unsigned char) * 102, 0, (struct sockaddr*) &server, sizeof(server)) == 102){
 		response.clear();
+		response += '\n';
 		response += ip;
-		response += ":   wake signal sent\n";
+		response += ":   wake signal sent";
 		int x = response.length();
 		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
@@ -123,8 +124,9 @@ void childPlay(string ip, string mac, int sock){
 	ssh_session my_ssh_session = ssh_new();
 	if (my_ssh_session == NULL){
 		response.clear();
+		response += '\n';
 		response += ip;
-		response += ": error at ssh session\n";
+		response += ": error at ssh session";
 		int x = response.length();
 		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
@@ -143,8 +145,9 @@ void childPlay(string ip, string mac, int sock){
 				connectSession(my_ssh_session, ip);
 			if(ssh_is_connected(my_ssh_session)){
 				response.clear();
+				response += '\n';
 				response += ip;
-				response += ":   online!\n";
+				response += ":   online!";
 				int x = response.length();
 				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
@@ -155,8 +158,9 @@ void childPlay(string ip, string mac, int sock){
 		else if(strcmp(command, "wake") == 0){
 			if(mac.size() == 0){
 				response.clear();
+				response += '\n';
 				response += ip;
-				response += ":   unknown MAC address\n";
+				response += ":   unknown MAC address";
 				int x = response.length();
 				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
@@ -177,10 +181,10 @@ void childPlay(string ip, string mac, int sock){
 				connectSession(my_ssh_session, ip);
 			if(ssh_is_connected(my_ssh_session) and sshCommand(my_ssh_session, command) != SSH_OK){
 				response.clear();
+				response += '\n';
 				response += ip;
 				response += ":   Could not execute command: ";
 				response += ssh_get_error(my_ssh_session);
-				response += '\n';
 				int x = response.length();
 				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
@@ -216,7 +220,7 @@ void createChildren(){
 		mac.push_back(getMac(c));
 		if((pid = fork()) == -1){
 			response.clear();
-			response += "Error at fork()\n";
+			response += "\nError at fork()";
 			int x = response.length();
 			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
@@ -273,7 +277,6 @@ void* writeManager(void *args){
 		removeCarriage(command);
 		
 		if(termline){
-			printw("\n");
 			termline = 0;
 		}
 		printw(command);
@@ -318,12 +321,13 @@ void ncursesDisplay(int sock){
 			}
 
 			else{
-				command.insert(command.begin() + x, (char)ch);
 				if(!termline){
 					printw("\n");
 					termline = 1;
 				}
 				getyx(stdscr, y, x);
+				command.insert(command.begin() + x, (char)ch);
+				
 				insch(ch);
 				move(y, x+1);
 			}

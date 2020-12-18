@@ -28,8 +28,8 @@ int verify_knownhost(ssh_session session){
 			break;
 		case SSH_KNOWN_HOSTS_CHANGED:
 			response.clear();
-			response += "Host key for server changed: it is now:\n";
-			response += "For security reasons, connection will be stopped\n";
+			response += "\nHost key for server changed: it is now:\n";
+			response += "For security reasons, connection will be stopped";
 			x = response.length();
 			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
@@ -41,8 +41,8 @@ int verify_knownhost(ssh_session session){
 			return -1;
 		case SSH_KNOWN_HOSTS_OTHER:
 			response.clear();
-			response += "The host key for this server was not found but an other type of key exists.\n";
-			response += "An attacker might change the default server key to confuse your client into thinking the key does not exist\n";
+			response += "\nThe host key for this server was not found but an other type of key exists.\n";
+			response += "An attacker might change the default server key to confuse your client into thinking the key does not exist";
 			x = response.length();
 			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
@@ -52,8 +52,8 @@ int verify_knownhost(ssh_session session){
 			return -1;
 		case SSH_KNOWN_HOSTS_NOT_FOUND:
 			response.clear();
-			response += "Could not find known host file.\n";
-			response += "If you accept the host key here, the file will be automatically created.\n";
+			response += "\nCould not find known host file.\n";
+			response += "If you accept the host key here, the file will be automatically created.";
 			x = response.length();
 			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
@@ -63,10 +63,9 @@ int verify_knownhost(ssh_session session){
 		case SSH_KNOWN_HOSTS_UNKNOWN:
 			hexa = ssh_get_hexa(hash, hlen);
 			response.clear();
-			response += "The server is unknown. Adding to the list of trusted host keys.";
+			response += "\nThe server is unknown. Adding to the list of trusted host keys.";
 			response += "Public key hash: ";
 			response += hexa;
-			response += '\n';
 			x = response.length();
 			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
@@ -77,9 +76,8 @@ int verify_knownhost(ssh_session session){
 			rc = ssh_session_update_known_hosts(session);
 			if (rc < 0) {
 				response.clear();
-				response += "Error ";
+				response += "\nError ";
 				response += strerror(errno);
-				response += '\n';
 				x = response.length();
 				pthread_mutex_lock(mx);
 				write(1, &x, sizeof(int));
@@ -90,9 +88,8 @@ int verify_knownhost(ssh_session session){
 			break;
 		case SSH_KNOWN_HOSTS_ERROR:
 			response.clear();
-			response += "Error: ";
+			response += "\nError: ";
 			response += ssh_get_error(session);
-			response += '\n';
 			x = response.length();
 			pthread_mutex_lock(mx);
 			write(1, &x, sizeof(int));
@@ -109,8 +106,9 @@ void connectSession(ssh_session session, string ip){
 	ssh_options_set(session, SSH_OPTIONS_HOST, ip.c_str());
 	if(ssh_connect(session) != SSH_OK){
 		response.clear();
+		response += '\n';
 		response += ip;
-		response += ":   error connecting\n";
+		response += ":   error connecting";
 		int x = response.length();
 		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
@@ -125,11 +123,10 @@ void connectSession(ssh_session session, string ip){
 	}
 	if(ssh_userauth_password(session, "admin", "adminpass") != SSH_AUTH_SUCCESS){
 		response.clear();
-		response += "auth error\n";
+		response += "\nauth error\n";
 		response += ip;
 		response += ":   ";
 		response += ssh_get_error(session);
-		response += '\n';
 		int x = response.length();
 		pthread_mutex_lock(mx);
 		write(1, &x, sizeof(int));
@@ -156,6 +153,9 @@ int sshCommand(ssh_session session, const char * command){
 	char buffer[256];
 	int nBytes;
 	pthread_mutex_lock(mx);
+	nBytes = 1;
+	write(1, &nBytes, sizeof(int));
+	write(1, "\n", sizeof(char));
 	while((nBytes = ssh_channel_read(channel, buffer, 256 * sizeof(char), 0)) > 0){
 		write(1, &nBytes, sizeof(int));
 		if(write(1, buffer, nBytes * sizeof(char)) != nBytes){
