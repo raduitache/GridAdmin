@@ -1,4 +1,11 @@
+#ifndef SSH_STUFF_H
+#define SSH_STUFF_H
+
+#include <string>
 #include <string.h>
+
+using namespace std;
+
 extern string response;
 extern pthread_mutex_t *mx;
 int verify_knownhost(ssh_session session){
@@ -177,3 +184,5 @@ int sshCommand(ssh_session session, const char * command){
 	ssh_channel_free(channel);
 	return SSH_OK;
 }
+
+#endif
