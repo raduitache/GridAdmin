@@ -11,7 +11,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 
-#include "family.hpp"
+#include "family.h"
 
 using namespace std;
 

@@ -17,7 +17,6 @@
 #include <libssh/libssh.h>
 
 #define SHM_FILENAME "gridAdmin.shm"
-#include "ssh_stuff.h"
 
 using namespace std;
 
@@ -28,7 +27,8 @@ int x, y, termline;
 string response;
 pthread_mutex_t *mx;
 
-#include "io.hpp"
+#include "ssh_stuff.h"
+#include "io.h"
 #include "misc.h"
 
 int main(){

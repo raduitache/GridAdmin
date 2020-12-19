@@ -8,7 +8,7 @@
 #include <ncurses.h>
 #include <pthread.h>
 
-#include "scroll.hpp"
+#include "scroll.h"
 
 using namespace std;
 
