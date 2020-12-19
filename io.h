@@ -50,6 +50,12 @@ void ncursesDisplay(int sock){
 	while(command != "quit\n"){
 		command.clear();
 		while((ch = getch()) != '\n'){
+			if(!termline){
+				resetCursor();
+				printw("\n");
+				printw(command.c_str());
+				termline = 1;
+			}
 			getyx(stdscr, y, x);
 			if(ch == KEY_BACKSPACE){
 				mvdelch(y, x-1);
@@ -71,10 +77,6 @@ void ncursesDisplay(int sock){
 			}
 
 			else{
-				if(!termline){
-					printw("\n");
-					termline = 1;
-				}
 				getyx(stdscr, y, x);
 				command.insert(command.begin() + x, (char)ch);
 				if(y == LINES - 1 && ch == '\n'){
