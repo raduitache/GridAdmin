@@ -10,7 +10,7 @@
 #include <libssh/libssh.h>
 
 #include "ssh_stuff.h"
-#include "wol.hpp"
+#include "wol.h"
 
 using namespace std;
 
