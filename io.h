@@ -23,6 +23,7 @@ void* writeManager(void *args){
 		command = new char[len+1];
 		read(fd, command, len);
 		command[len] = 0;
+		resetCursor();
 		formatCommand(command);
 		
 		if(termline){
@@ -82,7 +83,7 @@ void ncursesDisplay(int sock){
 					prevRows.push(string(line));
 					move(y, x);
 				}
-
+				resetCursor();
 				insch(ch);
 				move(y, x+1);
 			}
