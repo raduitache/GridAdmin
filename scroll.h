@@ -58,8 +58,10 @@ void scrollDown(){
 		mvwinstr(stdscr, 0, 0, prevLine);
 		prevRows.push(string(prevLine));
 		scrl(1);
+		mvwinstr(stdscr, 0, 0, prevLine);
 		mvprintw(LINES-1, 0, nextRows.top().c_str());
 		scrl(-1);
+		mvprintw(0, 0, prevLine);
 		nextRows.pop();
 		move(y, x);
 		if(nextRows.empty())
