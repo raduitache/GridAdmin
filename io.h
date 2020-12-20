@@ -52,9 +52,15 @@ void ncursesDisplay(int sock){
 		while((ch = getch()) != '\n'){
 			getyx(stdscr, y, x);
 			if(ch == KEY_BACKSPACE){
-				mvdelch(y, x-1);
-				if(command.length())
+				if(command.length()){
+					resetCursor();
+					if(!termline)
+						printw("\n%s", command.c_str());
+					termline = 1;
+					getyx(stdscr, y, x);
+					mvdelch(y, x-1);
 					command.erase(x - 1, 1);
+				}
 			}
 			else if(ch == KEY_LEFT){
 				move(y, x-1);
