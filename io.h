@@ -51,24 +51,7 @@ void ncursesDisplay(int sock){
 		command.clear();
 		while((ch = getch()) != '\n'){
 			getyx(stdscr, y, x);
-			if(ch == KEY_BACKSPACE){
-				if(command.length()){
-					resetCursor();
-					if(!termline)
-						printw("\n%s", command.c_str());
-					termline = 1;
-					getyx(stdscr, y, x);
-					mvdelch(y, x-1);
-					command.erase(x - 1, 1);
-				}
-			}
-			else if(ch == KEY_LEFT){
-				move(y, x-1);
-			}
-			else if(ch == KEY_RIGHT){
-				move(y, min(command.length(), (unsigned long)x+1));
-			}
-			else if (ch == KEY_UP){
+			if (ch == KEY_UP){
 				scrollUp();
 			}
 			else if (ch == KEY_DOWN)
@@ -84,15 +67,30 @@ void ncursesDisplay(int sock){
 					termline = 1;
 				}
 				getyx(stdscr, y, x);
-				command.insert(command.begin() + x, (char)ch);
-				if(y == LINES - 1 && ch == '\n'){
-					char *line;
-					mvwinstr(stdscr, 0, 0, line);
-					prevRows.push(string(line));
-					move(y, x);
+
+				if(ch == KEY_BACKSPACE){
+					if(command.length()){
+						mvdelch(y, max(x-1, 0));
+						command.erase(max(x - 1, 0), 1);
+					}
 				}
-				insch(ch);
-				move(y, x+1);
+				else if(ch == KEY_LEFT){
+					move(y, max(x-1, 0));
+				}
+				else if(ch == KEY_RIGHT){
+					move(y, min(command.length(), (unsigned long)x+1));
+				}
+				else{
+					command.insert(command.begin() + x, (char)ch);
+					if(y == LINES - 1 && ch == '\n'){
+						char *line;
+						mvwinstr(stdscr, 0, 0, line);
+						prevRows.push(string(line));
+						move(y, x);
+					}
+					insch(ch);
+					move(y, x+1);
+				}
 			}
 		}
 		getyx(stdscr, y, x);
