@@ -38,29 +38,40 @@ void formatCommand(char *str){
 }
 
 void scrollUp(){
-	if(prevRows.size()){
+	if(!prevRows.empty()){
 		char lastLine[COLS + 1];
 		getyx(stdscr, y, x);
-		mvwinstr(stdscr, y, 0, lastLine);
+		mvwinstr(stdscr, LINES - 1, 0, lastLine);
 		nextRows.push(string(lastLine));
 		scrl(-1);
 		mvprintw(0, 0, prevRows.top().c_str());
 		prevRows.pop();
 		move(y, x);
+		curs_set(0);
 	}
 }
 
 void scrollDown(){
-	if(nextRows.size()){
+	if(!nextRows.empty()){
 		char prevLine[COLS + 1];
 		getyx(stdscr, y, x);
 		mvwinstr(stdscr, 0, 0, prevLine);
 		prevRows.push(string(prevLine));
 		scrl(1);
-		mvprintw(LINES-2, 0, nextRows.top().c_str());
+		mvwinstr(stdscr, 0, 0, prevLine);
+		mvprintw(LINES-1, 0, nextRows.top().c_str());
+		scrl(-1);
+		mvprintw(0, 0, prevLine);
 		nextRows.pop();
 		move(y, x);
+		if(nextRows.empty())
+			curs_set(1);
 	}
+}
+
+void resetCursor(){
+	while(!nextRows.empty())
+		scrollDown();
 }
 
 #endif
