@@ -12,7 +12,7 @@
 
 using namespace std;
 
-extern int termline, x, y;
+extern int termline, x, y, terminationFlag;
 extern stack<string> prevRows;
 
 void* writeManager(void *args){
@@ -20,6 +20,10 @@ void* writeManager(void *args){
 	char *command;
     while(true){
 		read(fd, &len, sizeof(int));
+		if(len == -1){
+			terminationFlag = 1;
+			return 0;
+		}
 		command = new char[len+1];
 		read(fd, command, len);
 		command[len] = 0;
@@ -47,7 +51,7 @@ void ncursesDisplay(int sock){
 	pthread_create(&thread, 0, writeManager, &sock);
 	string command;
 	chtype ch;
-	while(command != "quit\n"){
+	while(!terminationFlag){
 		command.clear();
 		while((ch = getch()) != '\n'){
 			getyx(stdscr, y, x);

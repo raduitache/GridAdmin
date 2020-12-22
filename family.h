@@ -15,8 +15,55 @@
 using namespace std;
 
 extern vector<int> sd;
+extern vector<string> ip;
 extern string response;
 extern pthread_mutex_t *mx;
+
+void connectionWork(string cmd){
+	int i;
+	int p = cmd.rfind(' ');
+	for(i = 0; i < ip.size(); i++)
+		if(ip[i] == cmd.substr(p + 1))
+			break;
+
+	if(i == ip.size()){
+		response.clear();
+		response += "\nThis ip is not valid";
+		int x = response.length();
+		pthread_mutex_lock(mx);
+		write(1, &x, sizeof(int));
+		write(1, response.c_str(), x * sizeof(char));
+		pthread_mutex_unlock(mx);
+		return;
+	}
+	response.clear();
+	response += "\nConnected to:   ";
+	response += ip[i];
+	int x = response.length();
+	pthread_mutex_lock(mx);
+	write(1, &x, sizeof(int));
+	write(1, response.c_str(), x * sizeof(char));
+	pthread_mutex_unlock(mx);
+	string command;
+	int len;
+	while(true){
+		getline(cin, command);
+		len = command.length() + 1;
+		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
+			response.clear();
+			response += "\nYou are already connected";
+			int x = response.length();
+			pthread_mutex_lock(mx);
+			write(1, &x, sizeof(int));
+			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
+			continue;
+		}
+		else if(command == "quit") return;
+		write(sd[i], &len, sizeof(int));
+		write(sd[i], command.c_str(), len * sizeof(char));
+	}
+}
 
 void parentWork(){
 	string command;
@@ -24,6 +71,18 @@ void parentWork(){
 	while(command != "quit"){
 		getline(cin, command);
 		len = command.length() + 1;
+		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
+			connectionWork(command);
+			response.clear();
+			response += "\nDisconnected.";
+			int x = response.length();
+			pthread_mutex_lock(mx);
+			write(1, &x, sizeof(int));
+			write(1, response.c_str(), x * sizeof(char));
+			pthread_mutex_unlock(mx);
+			continue;
+		}
+		
 		for(int i = 0; i < sd.size(); i++){
 			write(sd[i], &len, sizeof(int));
 			write(sd[i], command.c_str(), len * sizeof(char));
@@ -31,6 +90,14 @@ void parentWork(){
 	}
 	for(int i = 0; i < sd.size(); i++)
 		wait(NULL);
+
+	response.clear();
+	response += "\nPress ENTER to return";
+	int x = response.length();
+	write(1, &x, sizeof(int));
+	write(1, response.c_str(), x * sizeof(char));
+	len = -1;
+	write(1, &len, sizeof(int));
 }
 
 void childPlay(string ip, string mac, int sock){

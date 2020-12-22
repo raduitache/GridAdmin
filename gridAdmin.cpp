@@ -23,7 +23,7 @@ using namespace std;
 vector<int> sd;
 vector<string> ip, mac;
 stack<string> prevRows, nextRows;
-int x, y, termline;
+int x, y, termline, terminationFlag = 0;
 string response;
 pthread_mutex_t *mx;
 
