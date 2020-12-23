@@ -10,13 +10,13 @@
 #include <libssh/libssh.h>
 
 #include "ssh_stuff.h"
+#include "send.h"
 #include "wol.h"
 
 using namespace std;
 
 extern vector<int> sd;
 extern vector<string> ip;
-extern string response;
 extern pthread_mutex_t *mx;
 
 void connectionWork(string cmd){
@@ -27,36 +27,21 @@ void connectionWork(string cmd){
 			break;
 
 	if(i == ip.size()){
-		response.clear();
-		response += "\nThis ip is not valid";
-		int x = response.length();
-		pthread_mutex_lock(mx);
-		write(1, &x, sizeof(int));
-		write(1, response.c_str(), x * sizeof(char));
-		pthread_mutex_unlock(mx);
+		string response = "\nThis ip is not valid";
+		send(response);
 		return;
 	}
-	response.clear();
-	response += "\nConnected to:   ";
+	string response = "\nConnected to:   ";
 	response += ip[i];
-	int x = response.length();
-	pthread_mutex_lock(mx);
-	write(1, &x, sizeof(int));
-	write(1, response.c_str(), x * sizeof(char));
-	pthread_mutex_unlock(mx);
+	send(response);
 	string command;
 	int len;
 	while(true){
 		getline(cin, command);
 		len = command.length() + 1;
 		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
-			response.clear();
-			response += "\nYou are already connected";
-			int x = response.length();
-			pthread_mutex_lock(mx);
-			write(1, &x, sizeof(int));
-			write(1, response.c_str(), x * sizeof(char));
-			pthread_mutex_unlock(mx);
+			string response = "\nYou are already connected";
+			send(response);
 			continue;
 		}
 		else if(command == "quit") return;
@@ -73,13 +58,8 @@ void parentWork(){
 		len = command.length() + 1;
 		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
 			connectionWork(command);
-			response.clear();
-			response += "\nDisconnected.";
-			int x = response.length();
-			pthread_mutex_lock(mx);
-			write(1, &x, sizeof(int));
-			write(1, response.c_str(), x * sizeof(char));
-			pthread_mutex_unlock(mx);
+			string response = "\nDisconnected.";
+			send(response);
 			continue;
 		}
 		
@@ -91,11 +71,8 @@ void parentWork(){
 	for(int i = 0; i < sd.size(); i++)
 		wait(NULL);
 
-	response.clear();
-	response += "\nPress ENTER to return";
-	int x = response.length();
-	write(1, &x, sizeof(int));
-	write(1, response.c_str(), x * sizeof(char));
+	string response = "\nPress ENTER to return";
+	send(response);
 	len = -1;
 	write(1, &len, sizeof(int));
 }
@@ -103,15 +80,11 @@ void parentWork(){
 void childPlay(string ip, string mac, int sock){
 	ssh_session my_ssh_session = ssh_new();
 	if (my_ssh_session == NULL){
-		response.clear();
+		string response;
 		response += '\n';
 		response += ip;
 		response += ": error at ssh session";
-		int x = response.length();
-		pthread_mutex_lock(mx);
-		write(1, &x, sizeof(int));
-		write(1, response.c_str(), x * sizeof(char));
-		pthread_mutex_unlock(mx);
+		send(response);
 	}
 	connectSession(my_ssh_session, ip);
 	int len;
@@ -124,28 +97,20 @@ void childPlay(string ip, string mac, int sock){
 			if(!ssh_is_connected(my_ssh_session))
 				connectSession(my_ssh_session, ip);
 			if(ssh_is_connected(my_ssh_session)){
-				response.clear();
+				string response;
 				response += '\n';
 				response += ip;
 				response += ":   online!";
-				int x = response.length();
-				pthread_mutex_lock(mx);
-				write(1, &x, sizeof(int));
-				write(1, response.c_str(), x * sizeof(char));
-				pthread_mutex_unlock(mx);
+				send(response);
 			}
 		}
 		else if(strcmp(command, "wake") == 0){
 			if(mac.size() == 0){
-				response.clear();
+				string response;
 				response += '\n';
 				response += ip;
 				response += ":   unknown MAC address";
-				int x = response.length();
-				pthread_mutex_lock(mx);
-				write(1, &x, sizeof(int));
-				write(1, response.c_str(), x * sizeof(char));
-				pthread_mutex_unlock(mx);
+				send(response);
 			}
 			else
 				sendMagicPackage(ip, getMacValuesFromString(mac));
@@ -160,16 +125,12 @@ void childPlay(string ip, string mac, int sock){
 			if(!ssh_is_connected(my_ssh_session))
 				connectSession(my_ssh_session, ip);
 			if(ssh_is_connected(my_ssh_session) and sshCommand(my_ssh_session, command) != SSH_OK){
-				response.clear();
+				string response;
 				response += '\n';
 				response += ip;
 				response += ":   Could not execute command: ";
 				response += ssh_get_error(my_ssh_session);
-				int x = response.length();
-				pthread_mutex_lock(mx);
-				write(1, &x, sizeof(int));
-				write(1, response.c_str(), x * sizeof(char));
-				pthread_mutex_unlock(mx);
+				send(response);
 			}
 		}
 		delete command;

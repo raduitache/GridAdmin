@@ -10,7 +10,6 @@
 
 using namespace std;
 
-extern string response;
 extern pthread_mutex_t *mx;
 
 unsigned char* createMagicPacket(vector<int> mac){
@@ -33,13 +32,9 @@ void sendMagicPackage(string ip, vector<int> mac){
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
 	if(setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1){
-		response.clear();
+		string response;
 		response += "\nsetsockopt (SO_BROADCAST)";
-		int x = response.length();
-		pthread_mutex_lock(mx);
-		write(1, &x, sizeof(int));
-		write(1, response.c_str(), x * sizeof(char));
-		pthread_mutex_unlock(mx);
+		send(response);
 		exit(EXIT_FAILURE);
 	}
 
@@ -53,15 +48,11 @@ void sendMagicPackage(string ip, vector<int> mac){
 	server.sin_port = htons(9);
 
 	if(sendto(udpSocket, packet, sizeof(unsigned char) * 102, 0, (struct sockaddr*) &server, sizeof(server)) == 102){
-		response.clear();
+		string response;
 		response += '\n';
 		response += ip;
 		response += ":   wake signal sent";
-		int x = response.length();
-		pthread_mutex_lock(mx);
-		write(1, &x, sizeof(int));
-		write(1, response.c_str(), x * sizeof(char));
-		pthread_mutex_unlock(mx);
+		send(response);
 	}
 	close(udpSocket);
 	free(packet);
