@@ -141,6 +141,18 @@ int sshCommand(ssh_session session, const char * command){
 			return SSH_ERROR;
 		}
 	}
+	nBytes = 1;
+	write(1, &nBytes, sizeof(int));
+	write(1, "\n", sizeof(char));
+	while((nBytes = ssh_channel_read(channel, buffer, 256 * sizeof(char), 1)) > 0){
+		write(1, &nBytes, sizeof(int));
+		if(write(1, buffer, nBytes * sizeof(char)) != nBytes){
+			ssh_channel_close(channel);
+			ssh_channel_free(channel);
+			pthread_mutex_unlock(mx);
+			return SSH_ERROR;
+		}
+	}
 	pthread_mutex_unlock(mx);
 
 	if(nBytes < 0){
