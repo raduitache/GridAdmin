@@ -10,8 +10,9 @@
 #include <libssh/libssh.h>
 
 #include "ssh_stuff.h"
-#include "send.h"
 #include "wol.h"
+#include "send.h"
+#include "conn.h"
 
 using namespace std;
 
@@ -19,36 +20,6 @@ extern vector<int> sd;
 extern vector<string> ip;
 extern pthread_mutex_t *mx;
 
-void connectionWork(string cmd){
-	int i;
-	int p = cmd.rfind(' ');
-	for(i = 0; i < ip.size(); i++)
-		if(ip[i] == cmd.substr(p + 1))
-			break;
-
-	if(i == ip.size()){
-		string response = "\nThis ip is not valid";
-		send(response);
-		return;
-	}
-	string response = "\nConnected to:   ";
-	response += ip[i];
-	send(response);
-	string command;
-	int len;
-	while(true){
-		getline(cin, command);
-		len = command.length() + 1;
-		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
-			string response = "\nYou are already connected";
-			send(response);
-			continue;
-		}
-		else if(command == "quit") return;
-		write(sd[i], &len, sizeof(int));
-		write(sd[i], command.c_str(), len * sizeof(char));
-	}
-}
 
 void parentWork(){
 	string command;
@@ -57,9 +28,7 @@ void parentWork(){
 		getline(cin, command);
 		len = command.length() + 1;
 		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
-			connectionWork(command);
-			string response = "\nDisconnected.";
-			send(response);
+			parentConn(command);
 			continue;
 		}
 		
@@ -120,6 +89,9 @@ void childPlay(string ip, string mac, int sock){
 				ssh_disconnect(my_ssh_session);
 			ssh_free(my_ssh_session);
 			return;
+		}
+		else if(strcmp(command, "conn") == 0){
+			childConn(ip, mac, sock);
 		}
 		else {
 			if(!ssh_is_connected(my_ssh_session))
