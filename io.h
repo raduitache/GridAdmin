@@ -66,6 +66,12 @@ void ncursesDisplay(int sock){
 			else{
 				resetCursor();
 				if(!termline){
+					if(y == LINES - 1){
+						char line[COLS+1];
+						mvwinstr(stdscr, 0, 0, line);
+						prevRows.push(string(line));
+						move(y, x);
+					}
 					printw("\n");
 					printw(command.c_str());
 					termline = 1;
@@ -86,17 +92,12 @@ void ncursesDisplay(int sock){
 				}
 				else{
 					command.insert(command.begin() + x, (char)ch);
-					if(y == LINES - 1 && ch == '\n'){
-						char *line;
-						mvwinstr(stdscr, 0, 0, line);
-						prevRows.push(string(line));
-						move(y, x);
-					}
 					insch(ch);
 					move(y, x+1);
 				}
 			}
 		}
+		termline = 0;
 		getyx(stdscr, y, x);
 		move(y, command.length());
 		command.append(1, '\n');
