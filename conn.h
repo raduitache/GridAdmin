@@ -36,6 +36,25 @@ void parentConn(string cmd){
 	}
 	string response = "\nWe connected";
 	send(response);
+	while(true){
+		getline(cin, command);
+		len = command.length() + 1;
+		if(command.substr(0, 4) == "conn" || command.substr(0, 7) == "connect"){
+			string response = "\nYou are already connected";
+			send(response);
+			continue;
+		}
+		write(sd[i], &len, sizeof(int));
+		write(sd[i], command.c_str(), len * sizeof(char));
+		read(sd[i], &len, sizeof(int));
+		if(len == -1){
+			string response = "\n";
+			response += ip[i];
+			response += ":   Disconnected.";
+			send(response);
+			return;
+		}
+	}
 }
 
 void childConn(string ip, string mac, int sock){
@@ -46,8 +65,39 @@ void childConn(string ip, string mac, int sock){
 		write(sock, &len, sizeof(int));
 		return;
 	}
+	connectSession(session, ip);
+	if(!ssh_is_connected(session)){
+		len = -1;
+		write(sock, &len, sizeof(int));
+		return;
+	}
 	len = 0;
+	char * command;
 	write(sock, &len, sizeof(int));	
+	while(true){
+		read(sock, &len, sizeof(int));
+		command = new char[len];
+		read(sock, command, len * sizeof(char));
+		if(strcmp(command, "quit") == 0){
+			len = -1;
+			write(sock, &len, sizeof(int));
+			return;
+		}
+		else {
+			if(sshCommand(session, command) != SSH_OK){
+				string response;
+				response += '\n';
+				response += ip;
+				response += ":   Could not execute command: ";
+				response += ssh_get_error(session);
+				send(response);
+			}
+			len = 0;
+			write(sock, &len, sizeof(int));
+		}
+		delete command;
+	}
+
 }
 
 #endif
