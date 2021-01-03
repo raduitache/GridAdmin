@@ -16,7 +16,6 @@
 using namespace std;
 
 extern pthread_mutex_t *mx;
-extern string response;
 extern vector<string> ip, mac;
 
 int setMutex(){
@@ -49,13 +48,9 @@ void createChildren(){
 		ip.push_back(getIp(c));
 		mac.push_back(getMac(c));
 		if((pid = fork()) == -1){
-			response.clear();
+			string response;
 			response += "\nError at fork()";
-			int x = response.length();
-			pthread_mutex_lock(mx);
-			write(1, &x, sizeof(int));
-			write(1, response.c_str(), x * sizeof(char));
-			pthread_mutex_unlock(mx);
+			send(response);
 		}
 		if(pid == 0){
 			f.close();

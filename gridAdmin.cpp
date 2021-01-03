@@ -23,8 +23,7 @@ using namespace std;
 vector<int> sd;
 vector<string> ip, mac;
 stack<string> prevRows, nextRows;
-int x, y, termline;
-string response;
+int x, y, termline, terminationFlag = 0;
 pthread_mutex_t *mx;
 
 #include "ssh_stuff.h"

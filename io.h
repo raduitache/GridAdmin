@@ -12,7 +12,7 @@
 
 using namespace std;
 
-extern int termline, x, y;
+extern int termline, x, y, terminationFlag;
 extern stack<string> prevRows;
 
 void* writeManager(void *args){
@@ -20,6 +20,10 @@ void* writeManager(void *args){
 	char *command;
     while(true){
 		read(fd, &len, sizeof(int));
+		if(len == -1){
+			terminationFlag = 1;
+			return 0;
+		}
 		command = new char[len+1];
 		read(fd, command, len);
 		command[len] = 0;
@@ -47,7 +51,7 @@ void ncursesDisplay(int sock){
 	pthread_create(&thread, 0, writeManager, &sock);
 	string command;
 	chtype ch;
-	while(command != "quit\n"){
+	while(!terminationFlag){
 		command.clear();
 		while((ch = getch()) != '\n'){
 			getyx(stdscr, y, x);
@@ -62,6 +66,12 @@ void ncursesDisplay(int sock){
 			else{
 				resetCursor();
 				if(!termline){
+					if(y == LINES - 1){
+						char line[COLS+1];
+						mvwinstr(stdscr, 0, 0, line);
+						prevRows.push(string(line));
+						move(y, x);
+					}
 					printw("\n");
 					printw(command.c_str());
 					termline = 1;
@@ -82,17 +92,12 @@ void ncursesDisplay(int sock){
 				}
 				else{
 					command.insert(command.begin() + x, (char)ch);
-					if(y == LINES - 1 && ch == '\n'){
-						char *line;
-						mvwinstr(stdscr, 0, 0, line);
-						prevRows.push(string(line));
-						move(y, x);
-					}
 					insch(ch);
 					move(y, x+1);
 				}
 			}
 		}
+		termline = 0;
 		getyx(stdscr, y, x);
 		move(y, command.length());
 		command.append(1, '\n');
