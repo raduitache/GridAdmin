@@ -39,10 +39,19 @@ int sftp_read_sync(ssh_session session, sftp_session sftp, string source, string
     access_type = O_RDONLY;
     file = sftp_open(sftp, source.c_str(),
                      access_type, 0);
+    sftp_attributes attr = sftp_fstat(file);
+    int x = 0;
+    pthread_mutex_lock(mx);
+    write(1, &x, sizeof(int));
+    write(1, &(attr->size), sizeof(uint64_t));
+    sftp_attributes_free(attr);
     if (file == NULL)
     {
         fprintf(stderr, "Can't open file for reading: %s\n",
                 ssh_get_error(session));
+        x = -1;
+        write(1, &x, sizeof(int));
+        pthread_mutex_unlock(mx);
         return SSH_ERROR;
     }
     if(dest.empty())
@@ -53,6 +62,9 @@ int sftp_read_sync(ssh_session session, sftp_session sftp, string source, string
     {
         fprintf(stderr, "Can't open file for writing: %s\n",
                 strerror(errno));
+        x = -1;
+        write(1, &x, sizeof(int));
+        pthread_mutex_unlock(mx);
         return SSH_ERROR;
     }
 
@@ -68,18 +80,26 @@ int sftp_read_sync(ssh_session session, sftp_session sftp, string source, string
             fprintf(stderr, "Error while reading file: %s\n",
                     ssh_get_error(session));
             sftp_close(file);
+            x = -1;
+            write(1, &x, sizeof(int));
+            pthread_mutex_unlock(mx);
             return SSH_ERROR;
         }
 
         nwritten = write(fd, buffer, nbytes);
+        write(1, &nwritten, sizeof(int));
         if (nwritten != nbytes)
         {
             fprintf(stderr, "Error writing: %s\n",
                     strerror(errno));
             sftp_close(file);
+            x = -1;
+            write(1, &x, sizeof(int));
+            pthread_mutex_unlock(mx);
             return SSH_ERROR;
         }
     }
+    pthread_mutex_unlock(mx);
 
     rc = sftp_close(file);
     if (rc != SSH_OK)

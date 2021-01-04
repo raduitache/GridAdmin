@@ -87,7 +87,17 @@ void childConn(string ip, string mac, int sock){
 		if(string(command).substr(0, 8) == "download"){
 			sftp_session sftp;
 			sftp = sftp_new(session);
-			sftp_init(sftp);
+			if(sftp == NULL){
+				len = -1;
+				write(sock, &len, sizeof(int));
+				return;
+			}
+			if(sftp_init(sftp) != SSH_OK){
+				len = -1;
+				write(sock, &len, sizeof(int));
+				sftp_free(sftp);
+				return;
+			}
 			string params[2];
 			getDownloadParams(command, params);
 			if(string(command) != params[0])
