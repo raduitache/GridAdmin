@@ -7,6 +7,7 @@
 #include <libssh/libssh.h>
 
 #include "send.h"
+#include "sftp.h"
 
 using namespace std;
 
@@ -82,6 +83,18 @@ void childConn(string ip, string mac, int sock){
 			len = -1;
 			write(sock, &len, sizeof(int));
 			return;
+		}
+		if(string(command).substr(0, 8) == "download"){
+			sftp_session sftp;
+			sftp = sftp_new(session);
+			sftp_init(sftp);
+			string params[2];
+			getDownloadParams(command, params);
+			if(string(command) != params[0])
+				sftp_read_sync(session, sftp, params[0], params[1]);
+			sftp_free(sftp);
+			len = 0;
+			write(sock, &len, sizeof(int));
 		}
 		else {
 			if(sshCommand(session, command) != SSH_OK){
