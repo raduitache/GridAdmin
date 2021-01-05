@@ -103,6 +103,7 @@ void ncursesDisplay(int sock){
 		command.append(1, '\n');
 		write(sock, command.c_str(), command.length());	
 	}
+	pthread_join(thread, NULL);
 }
 
 #endif
