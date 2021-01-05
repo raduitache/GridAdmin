@@ -2,6 +2,7 @@
 #define IO_HPP
 
 #include <stack>
+#include <cmath>
 #include <string>
 #include <unistd.h>
 #include <stdlib.h>
@@ -15,6 +16,43 @@ using namespace std;
 extern int termline, x, y, terminationFlag;
 extern stack<string> prevRows;
 
+int downloadFlag;
+
+void downloadRoutine(int fd){
+	uint64_t totalSize, currentSize = 0;
+	int currentRead;
+	int ticks;
+	read(fd, &totalSize, sizeof(uint64_t));
+	getyx(stdscr, y, x);
+	if(y == LINES - 1);
+		scrollDown();
+	while(currentSize != totalSize){
+		read(fd, &currentRead, sizeof(int));
+		if(currentRead == -1){
+			pthread_mutex_unlock(mx);
+			downloadFlag = 0;
+			return;
+		}
+		currentSize += currentRead;
+		ticks = floor((double) currentSize / (double) totalSize * (COLS - 2));
+		move(LINES - 1, 0);
+		insch('[');
+		move(LINES - 1, 1);
+		getyx(stdscr, y, x);
+		while(x != COLS - 2){
+			if(x <= ticks)
+				insch('=');
+			else
+				insch(' ');
+			move(LINES-1, ++x);
+		}
+		insch(']');
+		move(LINES-1, ++x);
+		refresh();
+	}
+	downloadFlag = 0;
+}
+
 void* writeManager(void *args){
     int fd = *(int*) args, len;
 	char *command;
@@ -23,6 +61,11 @@ void* writeManager(void *args){
 		if(len == -1){
 			terminationFlag = 1;
 			return 0;
+		}
+		if(len == 0){
+			downloadFlag = 1;
+			downloadRoutine(fd);
+			continue;
 		}
 		command = new char[len+1];
 		read(fd, command, len);
@@ -40,7 +83,7 @@ void* writeManager(void *args){
 }
 
 void ncursesDisplay(int sock){
-	termline = x = y = 0;
+	termline = x = y = downloadFlag = 0;
 	initscr();
 	cbreak();
 	noecho();
@@ -54,6 +97,8 @@ void ncursesDisplay(int sock){
 	while(!terminationFlag){
 		command.clear();
 		while((ch = getch()) != '\n'){
+			if(downloadFlag)
+				continue;
 			getyx(stdscr, y, x);
 			if (ch == KEY_UP){
 				scrollUp();
