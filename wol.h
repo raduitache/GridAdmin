@@ -12,7 +12,7 @@ using namespace std;
 
 extern pthread_mutex_t *mx;
 
-unsigned char* createMagicPacket(vector<int> mac){
+unsigned char* createMagicPacket(vector<unsigned char> mac){
 	unsigned char *packet = (unsigned char*)malloc(102 * sizeof(unsigned char));
 	for(int i = 0; i < 6; i++)
 		packet[i] = 0xff;
@@ -22,7 +22,7 @@ unsigned char* createMagicPacket(vector<int> mac){
 	return packet;
 }
 
-void sendMagicPackage(string ip, vector<int> mac){
+void sendMagicPackage(string ip, vector<unsigned char> mac){
 	unsigned char *packet = createMagicPacket(mac);
 	int udpSocket, broadcast = 1;
 	struct sockaddr_in server, client;
@@ -69,8 +69,8 @@ string getMac(string c){
 	return c.substr(x + 1);
 }
 
-vector<int> getMacValuesFromString(string mac){
-	vector<int> res(6);
+vector<unsigned char> getMacValuesFromString(string mac){
+	vector<unsigned char> res(6);
 	transform(mac.begin(), mac.end(), mac.begin(), ::toupper);
 	for(int i = 0; i < 6; i++){
 		if(mac[i * 3] >= 'A')
